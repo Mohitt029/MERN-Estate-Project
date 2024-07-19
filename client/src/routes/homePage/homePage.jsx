@@ -4,19 +4,15 @@ import "./homePage.scss";
 import { AuthContext } from "../../context/AuthContext";
 
 function HomePage() {
-
   const {currentUser} = useContext(AuthContext)
-
   return (
     <div className="homePage">
       <div className="textContainer">
         <div className="wrapper">
-          <h1 className="title">Find Real Estate & Get Your Dream Place</h1>
-          <p>
-            Lorem ipsum dolor sit amet consectetur adipisicing elit. Eos
-            explicabo suscipit cum eius, iure est nulla animi consequatur
-            facilis id pariatur fugit quos laudantium temporibus dolor ea
-            repellat provident impedit!
+        <h1 className="title">         
+            Unlock the Door to Your Dream Home</h1>
+          <p style={{textAlign: "justify", fontSize: "17px", transition: "all 0.3s ease-in-out"}}>
+          Find your dream home with ease. Our app offers seamless property browsing, expert guidance, and personalized services. Stay updated with the latest listings and connect with trusted agents. At Greenfield Realty, we turn houses into lasting memories.
           </p>
           <SearchBar />
           <div className="boxes">
@@ -26,7 +22,7 @@ function HomePage() {
             </div>
             <div className="box">
               <h1>200</h1>
-              <h2>Award Gained</h2>
+              <h2>Awards Gained</h2>
             </div>
             <div className="box">
               <h1>2000+</h1>
