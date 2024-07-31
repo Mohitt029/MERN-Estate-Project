@@ -1,156 +1,79 @@
-import prisma from "../lib/prisma.js";
-import bcrypt from "bcrypt";
+import bcrypt from 'bcrypt';
+import User from '../models/user.model.js';
+import { errorHandler } from '../utils/error.js';
+import Listing from '../models/listing.model.js';
 
-export const getUsers = async (req, res) => {
-  try {
-    const users = await prisma.user.findMany();
-    res.status(200).json(users);
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Failed to get users!" });
-  }
+export const test = (req, res) => {
+  res.json({
+    message: 'Api route is working!',
+  });
 };
 
-export const getUser = async (req, res) => {
-  const id = req.params.id;
+export const updateUser = async (req, res, next) => {
+  if (req.user.id !== req.params.id)
+    return next(errorHandler(401, 'You can only update your own account!'));
   try {
-    const user = await prisma.user.findUnique({
-      where: { id },
-    });
-    res.status(200).json(user);
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Failed to get user!" });
-  }
-};
-
-export const updateUser = async (req, res) => {
-  const id = req.params.id;
-  const tokenUserId = req.userId;
-  const { password, avatar, ...inputs } = req.body;
-
-  if (id !== tokenUserId) {
-    return res.status(403).json({ message: "Not Authorized!" });
-  }
-
-  let updatedPassword = null;
-  try {
-    if (password) {
-      updatedPassword = await bcrypt.hash(password, 10);
+    if (req.body.password) {
+      req.body.password = bcrypt.hashSync(req.body.password, 10);
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id },
-      data: {
-        ...inputs,
-        ...(updatedPassword && { password: updatedPassword }),
-        ...(avatar && { avatar }),
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      {
+        $set: {
+          username: req.body.username,
+          email: req.body.email,
+          password: req.body.password,
+          avatar: req.body.avatar,
+        },
       },
-    });
+      { new: true }
+    );
 
-    const { password: userPassword, ...rest } = updatedUser;
+    const { password, ...rest } = updatedUser._doc;
 
     res.status(200).json(rest);
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Failed to update users!" });
+  } catch (error) {
+    next(error);
   }
 };
 
-export const deleteUser = async (req, res) => {
-  const id = req.params.id;
-  const tokenUserId = req.userId;
-
-  if (id !== tokenUserId) {
-    return res.status(403).json({ message: "Not Authorized!" });
-  }
-
+export const deleteUser = async (req, res, next) => {
+  if (req.user.id !== req.params.id)
+    return next(errorHandler(401, 'You can only delete your own account!'));
   try {
-    await prisma.user.delete({
-      where: { id },
-    });
-    res.status(200).json({ message: "User deleted" });
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Failed to delete users!" });
+    await User.findByIdAndDelete(req.params.id);
+    res.clearCookie('access_token');
+    res.status(200).json('User has been deleted!');
+  } catch (error) {
+    next(error);
   }
 };
 
-export const savePost = async (req, res) => {
-  const postId = req.body.postId;
-  const tokenUserId = req.userId;
-
-  try {
-    const savedPost = await prisma.savedPost.findUnique({
-      where: {
-        userId_postId: {
-          userId: tokenUserId,
-          postId,
-        },
-      },
-    });
-
-    if (savedPost) {
-      await prisma.savedPost.delete({
-        where: {
-          id: savedPost.id,
-        },
-      });
-      res.status(200).json({ message: "Post removed from saved list" });
-    } else {
-      await prisma.savedPost.create({
-        data: {
-          userId: tokenUserId,
-          postId,
-        },
-      });
-      res.status(200).json({ message: "Post saved" });
+export const getUserListings = async (req, res, next) => {
+  if (req.user.id === req.params.id) {
+    try {
+      const listings = await Listing.find({ userRef: req.params.id });
+      res.status(200).json(listings);
+    } catch (error) {
+      next(error);
     }
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Failed to delete users!" });
+  } else {
+    return next(errorHandler(401, 'You can only view your own listings!'));
   }
 };
 
-export const profilePosts = async (req, res) => {
-  const tokenUserId = req.userId;
+export const getUser = async (req, res, next) => {
   try {
-    const userPosts = await prisma.post.findMany({
-      where: { userId: tokenUserId },
-    });
-    const saved = await prisma.savedPost.findMany({
-      where: { userId: tokenUserId },
-      include: {
-        post: true,
-      },
-    });
 
-    const savedPosts = saved.map((item) => item.post);
-    res.status(200).json({ userPosts, savedPosts });
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Failed to get profile posts!" });
-  }
-};
+    const user = await User.findById(req.params.id);
 
-export const getNotificationNumber = async (req, res) => {
-  const tokenUserId = req.userId;
-  try {
-    const number = await prisma.chat.count({
-      where: {
-        userIDs: {
-          hasSome: [tokenUserId],
-        },
-        NOT: {
-          seenBy: {
-            hasSome: [tokenUserId],
-          },
-        },
-      },
-    });
-    res.status(200).json(number);
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Failed to get profile posts!" });
+    if (!user) return next(errorHandler(404, 'User not found!'));
+
+    const { password: pass, ...rest } = user._doc;
+
+    res.status(200).json(rest);
+  } catch (error) {
+    next(error);
   }
 };
